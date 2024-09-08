@@ -9,8 +9,7 @@ int main (int argc, char *argv[])
 
     for (i = 0; i<sizeof(unsigned long); i++)
     {
-        printf("%02x ", *((unsigned char *)&p));
-        p++;
+        printf("%02x ", ((unsigned char *)p)[i]);
     }
 
     printf("\n");
