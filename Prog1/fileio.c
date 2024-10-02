@@ -24,13 +24,13 @@ FSError fserror;
 //
 
 static bool seek_file(File file, SeekAnchor start, long offset) {
-  
-  if (! file || (start != BEGINNING_OF_FILE && 
+
+  if (! file.fp || (start != BEGINNING_OF_FILE && 
 		 start != CURRENT_POSITION && start != END_OF_FILE)) {
     return false;
   }
   else {
-    if (! fseek(file, offset, start == BEGINNING_OF_FILE ? SEEK_SET : 
+    if (! fseek(file.fp, offset, start == BEGINNING_OF_FILE ? SEEK_SET : 
 		(start == END_OF_FILE ? SEEK_END : SEEK_CUR))) {
       return true;
     }
@@ -49,32 +49,35 @@ static bool seek_file(File file, SeekAnchor start, long offset) {
 // 'fserror' is set to OPEN_FAILED, otherwise to NONE.
 File open_file(char *name) {
   
-  File fp;
+  File file;
 
+  file.mem = malloc(5*sizeof(unsigned char));
 
   // HINT:  Your new implementation probably needs a call to malloc()!
   
   fserror = NONE;
   
   // try to open existing file
-  fp = fopen(name, "r+");
-  if (! fp) {
+  file.fp = fopen(name, "r+");
+  if (! file.fp) 
+  {
     // fail, fall back to creation
-    fp = fopen(name, "w+");
-    if (! fp) {
+    file.fp = fopen(name, "w+");
+    if (! file.fp) 
+    {
       fserror = OPEN_FAILED;
-      return NULL;
     }
   }
-  
-  return fp;
+
+  return file;
 }
 
 // closes file with handle 'file'. If the close fails for any reason,
 // the global 'fserror' is set to CLOSE_FAILED, otherwise to NONE.
 void close_file(File file) {
 
-  if (file && ! fclose(file)) {
+  free(file.mem);
+  if (file.fp && ! fclose(file.fp)) {
     fserror=NONE;
   }
   else {
@@ -93,12 +96,12 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
 
   fserror = NONE;
 
-  if (! file || ! seek_file(file, start, offset)) {
+  if (! file.fp || ! seek_file(file, start, offset)) {
     fserror = READ_FAILED;
   }
   else {
-    bytes_read = fread(data, 1, num_bytes, file);
-    if (ferror(file)) {
+    bytes_read = fread(data, 1, num_bytes, file.fp);
+    if (ferror(file.fp)) {
       fserror = READ_FAILED;
     }
   }
@@ -115,19 +118,92 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
 // fails and ILLEGAL_MACHO is stored in the global 'fserror'.  If the
 // write fails for any other reason, 'fserror' is set to WRITE_FAILED,
 // otherwise to NONE.
-unsigned long write_file_at(File file, void *data, unsigned long num_bytes, 
-			    SeekAnchor start, long offset) {
+unsigned long write_file_at(File file, void *data, unsigned long num_bytes, SeekAnchor start, long offset) 
+{
+
+  //appending up to 4 characters already in the file to mem
+  int ch;
+  int count = 0;
+  fseek(file.fp, 0, SEEK_SET);
+  while(((ch=getc(file.fp)) != EOF) && count < 4)
+  {
+    file.mem[count] = ch;
+    count++;
+  }
+  file.mem[count] = '\0';
   
+  fseek(file.fp, 0, SEEK_SET);
+
+
+  unsigned char *d = malloc(4*sizeof(unsigned char));
   unsigned long bytes_written = 0L;
-  unsigned char *d = (unsigned char *)data;
+
+  //if mem is empty just copy the contents of null
+  if (file.mem[0] == '\0')
+  {
+    printf("[DEBUG] Memory does not contain any info:\n");
+
+    printf("[DEBUG] data value is: ");
+    for (int i = 0; i<sizeof(data); i++)
+    {
+        printf("%02x ", ((unsigned char *)data)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)data)[i], ((unsigned char*) data)[i]);
+        if(((unsigned char *)data)[i] == '\0') break;
+    }
+    printf("\n");
+
+
+    strcpy(d, (unsigned char *) data);
+
+    printf("[DEBUG] d-value is: ");
+    for (int i = 0; i<sizeof(unsigned long); i++)
+    {
+        printf("%02x ", ((unsigned char *)d)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)d)[i], ((unsigned char *)d)[i]);
+        if(((unsigned char *)d)[i] == '\0') break;
+    }
+    printf("\n");
+  }
+  else
+  {
+    printf("[DEBUG] mem value is: ");
+    for (int i = 0; i<sizeof(file.mem); i++)
+    {
+        printf("%02x ", ((unsigned char *)file.mem)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)file.mem)[i], ((unsigned char*)file.mem)[i]);
+        if(((unsigned char *)file.mem)[i] == '\0') break;
+    }
+    printf("\n");
+
+    printf("[DEBUG] data value is: ");
+    for (int i = 0; i<sizeof(data); i++)
+    {
+        printf("%02x ", ((unsigned char *)data)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)data)[i], ((unsigned char*) data)[i]);
+        if(((unsigned char *)data)[i] == '\0') break;
+    }
+    printf("\n");
+
+    strcpy(d, (unsigned char*) file.mem);
+    strcat(d, (unsigned char *) data);
+
+    printf("[DEBUG] d-value is: ");
+    for (int i = 0; i<sizeof(unsigned long); i++)
+    {
+        printf("%02x ", ((unsigned char *)d)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)d)[i], ((unsigned char *)d)[i]);
+        if(((unsigned char *)d)[i] == '\0') break;
+    }
+    printf("\n");
+  }
+
+
 
   fserror = NONE;
-  if (! file || ! seek_file(file, start, offset)) {
-    fserror = WRITE_FAILED;
-  }
+  if (! file.fp || ! seek_file(file, start, offset)) {fserror = WRITE_FAILED;}
   else if (offset == 0L &&
-	   num_bytes >= 4 &&
-	   d[0] == 0xFE &&
+	   strlen(d) >= 4 &&
+	   d[0] == 0xFE && 
 	   d[1] == 0xED &&
 	   d[2] == 0xFA &&
 	   (d[3] == 0xCE || d[3] == 0xCF)) {
@@ -136,10 +212,8 @@ unsigned long write_file_at(File file, void *data, unsigned long num_bytes,
     fserror = ILLEGAL_MACHO;
   }
   else {
-    bytes_written = fwrite(data, 1, num_bytes, file);
-    if (bytes_written < num_bytes) {
-      fserror = WRITE_FAILED;
-    }
+    bytes_written = fwrite(data, 1, num_bytes, file.fp);
+    if (bytes_written < num_bytes) {fserror = WRITE_FAILED;}
   }
   return bytes_written;
 }

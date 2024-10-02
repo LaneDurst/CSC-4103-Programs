@@ -22,14 +22,12 @@ typedef enum  {
   ILLEGAL_MACHO
 } FSError;
 
-typedef struct _File
+// file handle type           // <---- YOU WILL HAVE TO MODIFY THIS TYPE! Hint: File should become
+typedef struct File
 {
   FILE *fp;
-  unsigned char mem[4];
-} _File;
-
-// file handle type           // <---- YOU WILL HAVE TO MODIFY THIS TYPE! Hint: File should become
-typedef _File* File;           // <---- a pointer to a structure type that contains the FILE * field 
+  unsigned char* mem;
+}File;                        // <---- a pointer to a structure type that contains the FILE * field 
                               // <---- and some other stuff
 // seek anchors
 typedef enum {
