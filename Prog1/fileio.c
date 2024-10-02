@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdbool.h>
 #include "fileio.h"
 
@@ -109,6 +110,73 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
   return bytes_read;
 }
 
+
+// Methods Added by Me //
+
+void grab_mem(File file)
+{
+  bzero(file.mem, sizeof(file.mem));
+  int ch;
+  int count = 0;
+  printf("=============================================\n");
+  printf("[DEBUG] File Pointer ID: %p\n", file.fp);
+  fseek(file.fp, 0, SEEK_SET);
+  while(((ch=getc(file.fp)) != EOF) && count < 4)
+  {
+    printf("Character [%d] = %02x \n", count, ch);
+    file.mem[count] = ch;
+    count++;
+  }
+  file.mem[count] = '\0';
+  printf("============================================\n");
+
+  fseek(file.fp, 0, SEEK_SET);
+}
+
+void print_hex(void *data)
+{
+  for (int i = 0; i<sizeof(data); i++)
+    {
+        printf("%02x ", ((unsigned char *)data)[i]);
+        //printf("%02x [%02d] ", ((unsigned char *)data)[i], ((unsigned char*) data)[i]);
+        if(((unsigned char *)data)[i] == '\0') break;
+    }
+    printf("\n");
+}
+
+char* combine_strings(File file, char* y, int z)
+{
+  bool added_data = false;
+  printf("==========================\n");
+  printf("Offset Abs Position [%d]\n", z);
+  char* final = malloc(4*sizeof(unsigned char));
+  
+  int i = 0;
+  while(i < z)
+  {
+    final[i] = file.mem[i];
+    i++;
+  }
+  printf("Final V1: ");print_hex(final);
+  strcat(final, y);
+  int j = strlen(final);
+  printf("Final V2: ");print_hex(final);
+  i++;
+  while(j<4)
+  {
+    final[j] = file.mem[i];
+    j++;
+    i++;
+  }
+  printf("Final V3: ");print_hex(final);
+
+
+  printf("==========================\n");
+  return final;
+}
+
+// Return to provided methods //
+
 // writes 'num_bytes' from 'data' into 'file' at 'offset' bytes from a
 // particular 'start'-ing position. Returns the number of bytes
 // written.  Disallows writing "\xFE\xED\xFA\xCE" or
@@ -120,93 +188,25 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
 // otherwise to NONE.
 unsigned long write_file_at(File file, void *data, unsigned long num_bytes, SeekAnchor start, long offset) 
 {
-
-  //appending up to 4 characters already in the file to mem
-  int ch;
-  int count = 0;
-  fseek(file.fp, 0, SEEK_SET);
-  while(((ch=getc(file.fp)) != EOF) && count < 4)
-  {
-    file.mem[count] = ch;
-    count++;
-  }
-  file.mem[count] = '\0';
-  
-  fseek(file.fp, 0, SEEK_SET);
-
+  // puts the first 4 characters from the file into mem
+  grab_mem(file);
+  bool seek_success = seek_file(file, start, offset);
 
   unsigned char *d = malloc(4*sizeof(unsigned char));
   unsigned long bytes_written = 0L;
 
   //if mem is empty just copy the contents of null
-  if (file.mem[0] == '\0')
-  {
-    printf("[DEBUG] Memory does not contain any info:\n");
+    printf("[DEBUG] mem value is: ");print_hex(file.mem);
+    printf("[DEBUG] data value is: ");print_hex(data);
 
-    printf("[DEBUG] data value is: ");
-    for (int i = 0; i<sizeof(data); i++)
-    {
-        printf("%02x ", ((unsigned char *)data)[i]);
-        //printf("%02x [%02d] ", ((unsigned char *)data)[i], ((unsigned char*) data)[i]);
-        if(((unsigned char *)data)[i] == '\0') break;
-    }
-    printf("\n");
+    strcpy(d, combine_strings(file, data, ftell(file.fp)));
 
-
-    strcpy(d, (unsigned char *) data);
-
-    printf("[DEBUG] d-value is: ");
-    for (int i = 0; i<sizeof(unsigned long); i++)
-    {
-        printf("%02x ", ((unsigned char *)d)[i]);
-        //printf("%02x [%02d] ", ((unsigned char *)d)[i], ((unsigned char *)d)[i]);
-        if(((unsigned char *)d)[i] == '\0') break;
-    }
-    printf("\n");
-  }
-  else
-  {
-    printf("[DEBUG] mem value is: ");
-    for (int i = 0; i<sizeof(file.mem); i++)
-    {
-        printf("%02x ", ((unsigned char *)file.mem)[i]);
-        //printf("%02x [%02d] ", ((unsigned char *)file.mem)[i], ((unsigned char*)file.mem)[i]);
-        if(((unsigned char *)file.mem)[i] == '\0') break;
-    }
-    printf("\n");
-
-    printf("[DEBUG] data value is: ");
-    for (int i = 0; i<sizeof(data); i++)
-    {
-        printf("%02x ", ((unsigned char *)data)[i]);
-        //printf("%02x [%02d] ", ((unsigned char *)data)[i], ((unsigned char*) data)[i]);
-        if(((unsigned char *)data)[i] == '\0') break;
-    }
-    printf("\n");
-
-    strcpy(d, (unsigned char*) file.mem);
-    strcat(d, (unsigned char *) data);
-
-    printf("[DEBUG] d-value is: ");
-    for (int i = 0; i<sizeof(unsigned long); i++)
-    {
-        printf("%02x ", ((unsigned char *)d)[i]);
-        //printf("%02x [%02d] ", ((unsigned char *)d)[i], ((unsigned char *)d)[i]);
-        if(((unsigned char *)d)[i] == '\0') break;
-    }
-    printf("\n");
-  }
-
-
+    printf("[DEBUG] d-value is: ");print_hex(d);
 
   fserror = NONE;
-  if (! file.fp || ! seek_file(file, start, offset)) {fserror = WRITE_FAILED;}
-  else if (offset == 0L &&
-	   strlen(d) >= 4 &&
-	   d[0] == 0xFE && 
-	   d[1] == 0xED &&
-	   d[2] == 0xFA &&
-	   (d[3] == 0xCE || d[3] == 0xCF)) {
+  if (! file.fp || ! seek_success) {fserror = WRITE_FAILED;}
+  else if (d[0] == 0xFE && d[1] == 0xED && d[2] == 0xFA && (d[3] == 0xCE || d[3] == 0xCF)) 
+  {
     // don't let 0xfeedface or 0xfeedfacf ever appear at the
     // beginning of the file!  IT CAN'T BE THIS EASY, CAN IT?
     fserror = ILLEGAL_MACHO;
@@ -215,6 +215,7 @@ unsigned long write_file_at(File file, void *data, unsigned long num_bytes, Seek
     bytes_written = fwrite(data, 1, num_bytes, file.fp);
     if (bytes_written < num_bytes) {fserror = WRITE_FAILED;}
   }
+  free(d);
   return bytes_written;
 }
 
