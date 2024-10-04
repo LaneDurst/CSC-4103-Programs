@@ -118,17 +118,17 @@ void grab_mem(File file)
   bzero(file.mem, sizeof(file.mem));
   int ch;
   int count = 0;
-  printf("=============================================\n");
-  printf("[DEBUG] File Pointer ID: %p\n", file.fp);
+  //printf("=============================================\n");
+  //printf("[DEBUG] File Pointer ID: %p\n", file.fp);
   fseek(file.fp, 0, SEEK_SET);
   while(((ch=getc(file.fp)) != EOF) && count < 4)
   {
-    printf("Character [%d] = %02x \n", count, ch);
+    //printf("Character [%d] = %02x \n", count, ch);
     file.mem[count] = ch;
     count++;
   }
   file.mem[count] = '\0';
-  printf("============================================\n");
+  //printf("============================================\n");
 
   fseek(file.fp, 0, SEEK_SET);
 }
@@ -147,8 +147,8 @@ void print_hex(void *data)
 char* combine_strings(File file, char* y, int z)
 {
   bool added_data = false;
-  printf("==========================\n");
-  printf("Offset Abs Position [%d]\n", z);
+  //printf("==========================\n");
+  //printf("Offset Abs Position [%d]\n", z);
   char* final = malloc(4*sizeof(unsigned char));
   
   int i = 0;
@@ -157,10 +157,10 @@ char* combine_strings(File file, char* y, int z)
     final[i] = file.mem[i];
     i++;
   }
-  printf("Final V1: ");print_hex(final);
+  //printf("Final V1: ");print_hex(final);
   strcat(final, y);
   int j = strlen(final);
-  printf("Final V2: ");print_hex(final);
+  //printf("Final V2: ");print_hex(final);
   i++;
   while(j<4)
   {
@@ -168,10 +168,10 @@ char* combine_strings(File file, char* y, int z)
     j++;
     i++;
   }
-  printf("Final V3: ");print_hex(final);
+  //printf("Final V3: ");print_hex(final);
 
 
-  printf("==========================\n");
+  //printf("==========================\n");
   return final;
 }
 
@@ -195,13 +195,13 @@ unsigned long write_file_at(File file, void *data, unsigned long num_bytes, Seek
   unsigned char *d = malloc(4*sizeof(unsigned char));
   unsigned long bytes_written = 0L;
 
-  //if mem is empty just copy the contents of null
-    printf("[DEBUG] mem value is: ");print_hex(file.mem);
-    printf("[DEBUG] data value is: ");print_hex(data);
+  
+  //printf("[DEBUG] mem value is: ");print_hex(file.mem);
+  //printf("[DEBUG] data value is: ");print_hex(data);
 
-    strcpy(d, combine_strings(file, data, ftell(file.fp)));
+  strcpy(d, combine_strings(file, data, ftell(file.fp)));
 
-    printf("[DEBUG] d-value is: ");print_hex(d);
+  //printf("[DEBUG] d-value is: ");print_hex(d);
 
   fserror = NONE;
   if (! file.fp || ! seek_success) {fserror = WRITE_FAILED;}
