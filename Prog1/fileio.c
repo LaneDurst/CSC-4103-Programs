@@ -45,6 +45,22 @@ static bool seek_file(File file, SeekAnchor start, long offset) {
 // public functions
 //
 
+void grab_mem(File file)
+{
+  bzero(file.mem, sizeof(file.mem));
+  int ch;
+  int count = 0;
+  //printf("=============================================\n");
+  //printf("[DEBUG] File Pointer ID: %p\n", file.fp);
+  fseek(file.fp, 0, SEEK_SET);
+  read_file_from(file, file.mem, 4, SEEK_SET, 0L);
+  file.mem[count] = '\0';
+  //printf("============================================\n");
+
+  fseek(file.fp, 0, SEEK_SET);
+}
+
+
 // opens file with pathname 'name'. Files are always opened for
 // read/write access.  If the open fails for any reason, the global
 // 'fserror' is set to OPEN_FAILED, otherwise to NONE.
@@ -113,21 +129,6 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
 
 
 // Methods Added by Me //
-
-void grab_mem(File file)
-{
-  bzero(file.mem, sizeof(file.mem));
-  int ch;
-  int count = 0;
-  //printf("=============================================\n");
-  //printf("[DEBUG] File Pointer ID: %p\n", file.fp);
-  fseek(file.fp, 0, SEEK_SET);
-  read_file_from(file, file.mem, 4, SEEK_SET, 0L);
-  file.mem[count] = '\0';
-  //printf("============================================\n");
-
-  fseek(file.fp, 0, SEEK_SET);
-}
 
 void print_hex(void *data)
 {
