@@ -45,62 +45,6 @@ static bool seek_file(File file, SeekAnchor start, long offset) {
 // public functions
 //
 
-void grab_mem(File file)
-{
-  bzero(file.mem, sizeof(file.mem));
-  int ch;
-  int count = 0;
-  //printf("=============================================\n");
-  //printf("[DEBUG] File Pointer ID: %p\n", file.fp);
-  fseek(file.fp, 0, SEEK_SET);
-  read_file_from(file, file.mem, 4, SEEK_SET, 0L);
-  file.mem[count] = '\0';
-  //printf("============================================\n");
-
-  fseek(file.fp, 0, SEEK_SET);
-}
-
-
-// opens file with pathname 'name'. Files are always opened for
-// read/write access.  If the open fails for any reason, the global
-// 'fserror' is set to OPEN_FAILED, otherwise to NONE.
-File open_file(char *name) {
-  
-  File file;
-  file.mem = malloc(4*sizeof(unsigned char));
-  // HINT:  Your new implementation probably needs a call to malloc()!
-  
-  fserror = NONE;
-  
-  // try to open existing file
-  file.fp = fopen(name, "r+");
-  if (! file.fp) 
-  {
-    // fail, fall back to creation
-    file.fp = fopen(name, "w+");
-    if (! file.fp) 
-    {
-      fserror = OPEN_FAILED;
-    }
-  }
-  grab_mem(file);
-
-  return file;
-}
-
-// closes file with handle 'file'. If the close fails for any reason,
-// the global 'fserror' is set to CLOSE_FAILED, otherwise to NONE.
-void close_file(File file) {
-
-  free(file.mem);
-  if (file.fp && ! fclose(file.fp)) {
-    fserror=NONE;
-  }
-  else {
-    fserror = CLOSE_FAILED;
-  }
-}
-
 // reads 'num_bytes' into 'data' from 'file' at 'offset' bytes from a
 // particular 'start'-ing position.  Returns the number of bytes
 // read. If the read fails for any reason, the global 'fserror' is set
@@ -125,6 +69,45 @@ unsigned long read_file_from(File file, void *data, unsigned long num_bytes,
   return bytes_read;
 }
 
+// opens file with pathname 'name'. Files are always opened for
+// read/write access.  If the open fails for any reason, the global
+// 'fserror' is set to OPEN_FAILED, otherwise to NONE.
+File open_file(char *name) {
+  
+  File file;
+  file.mem = malloc(4*sizeof(unsigned char));
+  // HINT:  Your new implementation probably needs a call to malloc()!
+  
+  fserror = NONE;
+  
+  // try to open existing file
+  file.fp = fopen(name, "r+");
+  if (! file.fp) 
+  {
+    // fail, fall back to creation
+    file.fp = fopen(name, "w+");
+    if (! file.fp) 
+    {
+      fserror = OPEN_FAILED;
+    }
+  }
+  read_file_from(file, file.mem, 4, SEEK_SET, 0L);
+
+  return file;
+}
+
+// closes file with handle 'file'. If the close fails for any reason,
+// the global 'fserror' is set to CLOSE_FAILED, otherwise to NONE.
+void close_file(File file) {
+
+  free(file.mem);
+  if (file.fp && ! fclose(file.fp)) {
+    fserror=NONE;
+  }
+  else {
+    fserror = CLOSE_FAILED;
+  }
+}
 
 // Methods Added by Me //
 
@@ -139,34 +122,44 @@ void print_hex(void *data)
     printf("\n");
 }
 
-char* combine_strings(File file, char* y, int z)
+//places characters from n until the end of the src string,
+//into the dest string
+void break_memory(char* first, char* second, File file, int offset)
 {
-  bool added_data = false;
-  //printf("==========================\n");
-  //printf("Offset Abs Position [%d]\n", z);
-  char* final = malloc(4*sizeof(unsigned char));
-  
+  int a = 0;
   int i = 0;
-  while(i < z)
+  for (i; i<offset; i++)
   {
-    final[i] = file.mem[i];
-    i++;
+    first[i] = file.mem[i];
   }
-  //printf("Final V1: ");print_hex(final);
-  strcat(final, y);
-  int j = strlen(final);
-  //printf("Final V2: ");print_hex(final);
   i++;
-  while(j<4)
+  for (i; i<sizeof(file.mem); i++)
   {
-    final[j] = file.mem[i];
-    j++;
-    i++;
+    second[a] = file.mem[i];
+    a++;
   }
-  //printf("Final V3: ");print_hex(final);
+}
 
+char* combine_strings(File file, char* data, int abs_offset)
+{
+  char* final = malloc(sizeof(file.mem) + sizeof(data));
+  char* first = malloc(sizeof(file.mem) - abs_offset + 1);
+  char* second = malloc(sizeof(file.mem) - abs_offset);
 
-  //printf("==========================\n");
+  break_memory(first, second, file, abs_offset);
+
+  /* printf("=====================================\n");
+  printf("[DEBUG] Abs Offset = %d\n", abs_offset);
+  printf("[DEBUG] First = "); print_hex(first);
+  printf("[DEBUG] Data = "); print_hex(data);
+  printf("[DEBUG] Second = "); print_hex(second); */
+
+  strcat(final, first);
+  strcat(final, data);
+  strcat(final, second);
+
+  /* printf("[DEBUG] Final = "); print_hex(final);
+  printf("=====================================\n"); */
   return final;
 }
 
@@ -183,18 +176,23 @@ char* combine_strings(File file, char* y, int z)
 // otherwise to NONE.
 unsigned long write_file_at(File file, void *data, unsigned long num_bytes, SeekAnchor start, long offset) 
 {
+  char* true_mem = malloc(sizeof(unsigned char)*4);
+  read_file_from(file, true_mem, 4, SEEK_SET, 0L);
   bool seek_success = seek_file(file, start, offset);
 
   unsigned char *d = malloc(4*sizeof(unsigned char));
   unsigned long bytes_written = 0L;
 
-  
-  //printf("[DEBUG] mem value is: ");print_hex(file.mem);
-  //printf("[DEBUG] data value is: ");print_hex(data);
+  /* printf("=====================================\n");
+  printf("[DEBUG] Stored mem value is: ");print_hex(file.mem);
+  printf("[DEBUG] Actual mem value is: ");print_hex(true_mem);
+
+  printf("[DEBUG] data value is: ");print_hex(data); */
 
   strcpy(d, combine_strings(file, data, ftell(file.fp)));
 
-  //printf("[DEBUG] d-value is: ");print_hex(d);
+  /* printf("[DEBUG] d-value is: ");print_hex(d);
+  printf("=====================================\n"); */
 
   fserror = NONE;
   if (! file.fp || ! seek_success) {fserror = WRITE_FAILED;}
@@ -207,7 +205,7 @@ unsigned long write_file_at(File file, void *data, unsigned long num_bytes, Seek
   else {
     bytes_written = fwrite(data, 1, num_bytes, file.fp);
     if (bytes_written < num_bytes) {fserror = WRITE_FAILED;}
-    else memcpy(file.mem, d, 4);
+    memcpy(file.mem, d, 4);
   }
   free(d);
   return bytes_written;
