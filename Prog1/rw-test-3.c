@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   write_file_at(f, "\xCF", 1, END_OF_FILE, -7L);
   fs_print_error();
 
-  printf("\nAbout to write one byte (0xCF)...\n");
+  printf("\nAbout to write one byte (0xFA)...\n");
   write_file_at(f, "\xFA", 1, END_OF_FILE, -8L);
   fs_print_error();
 
