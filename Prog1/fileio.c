@@ -67,10 +67,7 @@ void grab_mem(File file)
 File open_file(char *name) {
   
   File file;
-
   file.mem = malloc(4*sizeof(unsigned char));
-  grab_mem(file);
-
   // HINT:  Your new implementation probably needs a call to malloc()!
   
   fserror = NONE;
@@ -86,6 +83,7 @@ File open_file(char *name) {
       fserror = OPEN_FAILED;
     }
   }
+  grab_mem(file);
 
   return file;
 }
@@ -209,7 +207,7 @@ unsigned long write_file_at(File file, void *data, unsigned long num_bytes, Seek
   else {
     bytes_written = fwrite(data, 1, num_bytes, file.fp);
     if (bytes_written < num_bytes) {fserror = WRITE_FAILED;}
-    memcpy(file.mem, d, 4);
+    else memcpy(file.mem, d, 4);
   }
   free(d);
   return bytes_written;
