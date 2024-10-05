@@ -176,8 +176,8 @@ char* combine_strings(File file, char* data, int abs_offset)
 // otherwise to NONE.
 unsigned long write_file_at(File file, void *data, unsigned long num_bytes, SeekAnchor start, long offset) 
 {
-  char* true_mem = malloc(sizeof(unsigned char)*4);
-  read_file_from(file, true_mem, 4, SEEK_SET, 0L);
+  //char* true_mem = malloc(sizeof(unsigned char)*4);
+  //read_file_from(file, true_mem, 4, SEEK_SET, 0L);
   bool seek_success = seek_file(file, start, offset);
 
   unsigned char *d = malloc(4*sizeof(unsigned char));
