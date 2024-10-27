@@ -1,52 +1,114 @@
 #include "prioque.h"
+#include "prioque.c"
 #include <regex.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <string.h>
+#include <inttypes.h>
+
+Queue* ArrivalQ;
+
+typedef struct Process{
+    int arrival_time;
+    int pid;
+    Queue* behaviors;
+}Process;
+
+typedef struct ProcessBehavior{
+    int cpuburst;
+    int ioburst;
+    int repeat;
+}ProcessBehavior;
+
+
+void init_process(Process* p)
+{
+    //TODO: DEFINE BEHAVIOR
+}
+
+static void read_process_descriptions(void)
+{
+    Process p;
+    ProcessBehavior b;
+    int32_t pid = 0;
+    bool first = true;
+    uint64_t arrival_time;
+
+    init_process(&p);
+    arrival_time = 0;
+    while (scanf("%" PRIu64, &arrival_time) != EOF)
+    {
+        scanf("%" PRId32 "%" PRIu64 "%" PRIu64 "%" PRIu64, &pid, &b.cpuburst, &b.ioburst, &b.repeat);
+        if (! first && p.pid != pid)
+        {
+            add_to_queue(&ArrivalQ, &p, INT64_MAX - p.arrival_time);
+            init_process(&p);
+        }
+        first = false;
+        p.pid = pid;
+        p.arrival_time = arrival_time;
+        add_to_queue(&p.behaviors, &b, 1);
+    }
+    add_to_queue(&ArrivalQ, &p, INT64_MAX - p.arrival_time);
+}
+
+void dump_arrival_queue(void)
+{
+    //TODO: DEFINE BEHAVIOR
+}
+
+bool processes_exist(void)
+{
+    //TODO: DEFINE BEHAVIOR
+}
+
+void queue_new_arrivals(void)
+{
+    //TODO: DEFINE BEHAVIOR
+}
+
+void execute_highest_priority_process(void)
+{
+    //TODO: DEFINE BEHAVIOR
+}
+
+void do_IO(void)
+{
+    //TODO: DEFINE BEHAVIOR
+}
 
 int main(int argc, char* argv[])
 {
-    const char* fileName = argv[1]; //grab file name from terminal input
-    FILE* fp = fopen(fileName, 'r'); //create a file pointer to the file
-    char currentLine[24];
-    const char delimiter[1] = '\t'; //all the values are seperated by a horizontal tab
+    Queue* q1;
+    Queue* q2;
+    Queue* q3;
+    Queue* q4;
+    init_queue(ArrivalQ, sizeof(void*), true, NULL, true);
+    init_queue(q1, sizeof(void*), true, NULL, true);
+    init_queue(q2, sizeof(void*), true, NULL, true);
+    init_queue(q3, sizeof(void*), true, NULL, true);
+    init_queue(q4, sizeof(void*), true, NULL, true);
 
-    Queue* to_be_queued;
-    init_queue(to_be_queued, 5*sizeof(int), true, NULL, true); 
+    init_process(&IdleProcess);
+    read_process_descriptions();
 
-
-    // Read all the Info From the File
-    if (fp != NULL)
-    {
-        while (fgets(currentLine, sizeof(currentLine), fp)) //reads the current line of the file into currentLine
-        {
-            int TIME = atoi(strtok(currentLine, delimiter)); //strtok grabs everything until a \t is met, atoi converts the value into an integer
-            int PID = atoi(strtok(currentLine, delimiter));
-            int RUN = atoi(strtok(currentLine, delimiter));
-            int IO = atoi(strtok(currentLine, delimiter));
-            int REPEAT = atoi(strtok(currentLine, delimiter));
-            add_to_queue(to_be_queued, (TIME, PID, RUN, IO, REPEAT), TIME);
-            bzero(currentLine); //reset currentLine after we get what we need, just in case
-        }
-        fclose(fp);
-    }
-    else
-    {
-        printf("Unable to Open %s: Exiting\n", fileName);
-        return 1;
+    if (argc > 1) 
+    {// for debugging
+    dump_arrival_queue();
     }
 
-    /////////////////////////////////////////////////////////////////
-    //                      DEBUG CODE BELOW                       //
-    for (int i = 0; i < to_be_queued->queuelength; i++)
+    int clock = 0;
+    while (processes_exist()) 
     {
-        pritnf(to_be_queued[i]);
+        clock++;
+        queue_new_arrivals();
+        execute_highest_priority_process();
+        do_IO();
     }
-    /////////////////////////////////////////////////////////////////
 
-    int clock = 0; // set the clock to 0
-    /* just an outline [DELETE WHEN FINISHED]
-        while (!empty_queue(q1) || !empty_queue(q2) || !empty_queue(q3) || !empty_queue(q4) || !empty_queue(to_be_queued))
-        {
+    clock++;
+    final_report();
 
-        }
-    */
+return 0;
 }
