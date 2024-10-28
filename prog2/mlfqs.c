@@ -21,6 +21,11 @@ typedef struct ProcessBehavior{
     int repeat;
 }ProcessBehavior;
 
+typedef struct ProcessCompletionInfo{
+    int pid;
+    int finalTime;
+}ProcessCompletionInfo;
+
 void init_process(Process* p)
 {
     //TODO: DEFINE BEHAVIOR
@@ -65,35 +70,60 @@ bool processes_exist(Queue* q1, Queue* q2, Queue* q3, Queue* q4)
         return true;
 }
 
-void queue_new_arrivals(void)
+void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
 {
     //TODO: DEFINE BEHAVIOR
+
+    // check ArrivalQ for processes whose TIME = currentTime?
+    // add these processes to highest priority queue q1
+    // do printf("CREATE: Process %d entered the ready queue at time %d", pid, currentTime);
 }
 
-void execute_highest_priority_process(void)
+void execute_highest_priority_process(int currentTime, struct ProcessCompletionInfo finalReport[])
 {
     //TODO: DEFINE BEHAVIOR
+
+    // iterate through each queue in order of priority?
+
+    // when you get to the process you need to figure out what queue it is in for the printf
+    // print should be printf("RUN: Process %d started execution from level %d at time %d; wants to execute for %d ticks", pid, queueLevel, currentTime, timeToI0);
 }
 
-void do_IO(void)
+void do_IO(int currentTime)
 {
     //TODO: DEFINE BEHAVIOR
+
+    //printf("I/O: Process %d blocked for I/O at time %d", pid, currentTime);
+}
+
+void final_report(int currentTime, struct ProcessCompletionInfo finalReport[])
+{
+    printf("Scheduler shutdown at time %d.\nTotal CPU usage for all processes scheduled:\n", currentTime);
+    //loop through each memeber of finalReport and print to screen
 }
 
 int main(int argc, char* argv[])
 {
+    // creating and initializing all of the queues
     Queue* q1;
     Queue* q2;
     Queue* q3;
     Queue* q4;
-    init_queue(ArrivalQ, sizeof(void*), true, NULL, true);
+    init_queue(ArrivalQ, sizeof(void*), true, NULL, true); // This queue is not created here as it is a global variable
     init_queue(q1, sizeof(void*), true, NULL, true);
     init_queue(q2, sizeof(void*), true, NULL, true);
     init_queue(q3, sizeof(void*), true, NULL, true);
     init_queue(q4, sizeof(void*), true, NULL, true);
 
-    init_process(&IdleProcess);
+    // this process is what runs when no actual processes exists or all processes are doing I/0
+    Process nullProcess;
+    ProcessBehavior nullProcessBehavior;
+    init_process(&nullProcess);
+
+    // read in all the process info from stdin
     read_process_descriptions();
+
+    struct ProcessCompletionInfo finalReport[queue_length(ArrivalQ)]; // this will function as storage for all process end times
 
     if (argc > 1) 
     {// for debugging
@@ -103,14 +133,14 @@ int main(int argc, char* argv[])
     int clock = 0;
     while (processes_exist(q1, q2, q3, q4)) 
     {
-        clock++;
-        queue_new_arrivals();
-        execute_highest_priority_process();
-        do_IO();
+        clock++; // might need to put this after do_IO, unsure
+        queue_new_arrivals(clock, q1);
+        execute_highest_priority_process(clock, finalReport);
+        do_IO(clock);
     }
 
     clock++;
-    final_report();
+    final_report(clock, finalReport);
 
 return 0;
 }
