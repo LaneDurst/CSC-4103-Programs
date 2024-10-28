@@ -21,7 +21,6 @@ typedef struct ProcessBehavior{
     int repeat;
 }ProcessBehavior;
 
-
 void init_process(Process* p)
 {
     //TODO: DEFINE BEHAVIOR
@@ -58,9 +57,12 @@ void dump_arrival_queue(void)
     //TODO: DEFINE BEHAVIOR
 }
 
-bool processes_exist(void)
+bool processes_exist(Queue* q1, Queue* q2, Queue* q3, Queue* q4)
 {
-    //TODO: DEFINE BEHAVIOR
+    if (empty_queue(ArrivalQ) && empty_queue(q1) && empty_queue(q2) && empty_queue(q3) && empty_queue(q4))
+        return false;
+    else
+        return true;
 }
 
 void queue_new_arrivals(void)
@@ -99,7 +101,7 @@ int main(int argc, char* argv[])
     }
 
     int clock = 0;
-    while (processes_exist()) 
+    while (processes_exist(q1, q2, q3, q4)) 
     {
         clock++;
         queue_new_arrivals();
