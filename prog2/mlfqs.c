@@ -8,12 +8,7 @@
 #include <inttypes.h>
 
 Queue* ArrivalQ;
-
-typedef struct Process{
-    int arrival_time;
-    int pid;
-    Queue* behaviors;
-}Process;
+Queue* finalReport;
 
 typedef struct ProcessBehavior{
     int cpuburst;
@@ -21,14 +16,18 @@ typedef struct ProcessBehavior{
     int repeat;
 }ProcessBehavior;
 
-typedef struct ProcessCompletionInfo{
+typedef struct Process{
+    int arrival_time;
     int pid;
-    int finalTime;
-}ProcessCompletionInfo;
+    int good; // stores how many times the process has behaved at this level
+    int bad; //stores how many times the process has misbehaved at this level
+    Queue* behaviors;
+}Process;
 
 void init_process(Process* p)
 {
-    //TODO: DEFINE BEHAVIOR
+    init_queue(p->behaviors, sizoef(ProcessBehavior), true, NULL, true);
+    //set all the values in Process to their base values. Will get changed later
 }
 
 static void read_process_descriptions(void)
@@ -57,9 +56,20 @@ static void read_process_descriptions(void)
     add_to_queue(&ArrivalQ, &p, INT64_MAX - p.arrival_time);
 }
 
-void dump_arrival_queue(void)
+void dump_arrival_queue(Queue* q)
 {
-    //TODO: DEFINE BEHAVIOR
+    element = 0;
+    rewind_queue(&q);
+    printf("Queue contains:\n");
+    while (! end_of_queue(&q)) 
+    {
+        printf("%" PRId64 " --> %d / %s with priority %" PRId32 ".\n",           
+	    ++element,
+	    ((SomeType *)pointer_to_current(&q))->a,
+	    ((SomeType *)pointer_to_current(&q))->buf,
+	    current_priority(&q));
+        next_element(&q);
+    }   
 }
 
 bool processes_exist(Queue* q1, Queue* q2, Queue* q3, Queue* q4)
@@ -99,7 +109,7 @@ void do_IO(int currentTime)
 void final_report(int currentTime, struct ProcessCompletionInfo finalReport[])
 {
     printf("Scheduler shutdown at time %d.\nTotal CPU usage for all processes scheduled:\n", currentTime);
-    //loop through each memeber of finalReport and print to screen
+    // need to loop through finalReport and print to screen
 }
 
 int main(int argc, char* argv[])
@@ -110,20 +120,20 @@ int main(int argc, char* argv[])
     Queue* q3;
     Queue* q4;
     init_queue(ArrivalQ, sizeof(void*), true, NULL, true); // This queue is not created here as it is a global variable
+    init_queue(finalReport, sizeof(void*), true, NULL, true); // This queue is a global queue, used to store each process and it's end time
     init_queue(q1, sizeof(void*), true, NULL, true);
     init_queue(q2, sizeof(void*), true, NULL, true);
     init_queue(q3, sizeof(void*), true, NULL, true);
     init_queue(q4, sizeof(void*), true, NULL, true);
 
     // this process is what runs when no actual processes exists or all processes are doing I/0
+    // this could also be an integer if need be
     Process nullProcess;
     ProcessBehavior nullProcessBehavior;
     init_process(&nullProcess);
 
     // read in all the process info from stdin
     read_process_descriptions();
-
-    struct ProcessCompletionInfo finalReport[queue_length(ArrivalQ)]; // this will function as storage for all process end times
 
     if (argc > 1) 
     {// for debugging
@@ -135,12 +145,12 @@ int main(int argc, char* argv[])
     {
         clock++; // might need to put this after do_IO, unsure
         queue_new_arrivals(clock, q1);
-        execute_highest_priority_process(clock, finalReport);
+        execute_highest_priority_process(clock);
         do_IO(clock);
     }
 
     clock++;
-    final_report(clock, finalReport);
+    final_report(clock);
 
 return 0;
 }
