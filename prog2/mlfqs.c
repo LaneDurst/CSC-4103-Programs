@@ -7,17 +7,17 @@
 #include <string.h>
 #include <inttypes.h>
 
-Queue* ArrivalQ;
-Queue* q1;
-Queue* q2;
-Queue* q3;
-Queue* q4;
-Queue* finalReport;
+Queue waitQ;
+Queue q1;
+Queue q2;
+Queue q3;
+Queue q4;
+Queue finalReport;
 
 typedef struct ProcessBehavior{
-    int cpuburst;
-    int ioburst;
-    int repeat;
+    long unsigned int cpuburst;
+    long unsigned int ioburst;
+    long unsigned int repeat;
 }ProcessBehavior;
 
 typedef struct Process{
@@ -25,7 +25,7 @@ typedef struct Process{
     int pid;
     int good; // stores how many times the process has behaved at this level
     int bad; // stores how many times the process has misbehaved at this level
-    Queue* behaviors;
+    Queue behaviors;
 }Process;
 
 typedef struct _SomeType {
@@ -35,8 +35,7 @@ typedef struct _SomeType {
 
 void init_process(Process* p)
 {
-    init_queue(p->behaviors, sizeof(ProcessBehavior), true, NULL, true);
-    //set all the values in Process to their base values. Will get changed later
+    init_queue(&p->behaviors, sizeof(ProcessBehavior), true, NULL, true);
 }
 
 static void read_process_descriptions(void)
@@ -53,8 +52,8 @@ static void read_process_descriptions(void)
     {
         scanf("%" PRId32 "%" PRIu64 "%" PRIu64 "%" PRIu64, &pid, &b.cpuburst, &b.ioburst, &b.repeat);
         if (! first && p.pid != pid)
-        {
-            add_to_queue(&ArrivalQ, &p, INT64_MAX - p.arrival_time);
+        {   
+            add_to_queue(&waitQ, &p, INT64_MAX - p.arrival_time);
             init_process(&p);
         }
         first = false;
@@ -62,28 +61,27 @@ static void read_process_descriptions(void)
         p.arrival_time = arrival_time;
         add_to_queue(&p.behaviors, &b, 1);
     }
-    add_to_queue(&ArrivalQ, &p, INT64_MAX - p.arrival_time);
+    add_to_queue(&waitQ, &p, INT64_MAX - p.arrival_time);
 }
 
 void dump_queue(Queue* q)
 {
-    int element = 0;
-    rewind_queue(&q);
+    long int element = 0;
+    rewind_queue(q);
     printf("Queue contains:\n");
-    while (! end_of_queue(&q)) 
+    while (! end_of_queue(q)) 
     {
-        printf("%" PRId64 " --> %d / %s with priority %" PRId32 ".\n",           
-	    ++element,
-	    ((SomeType *)pointer_to_current(&q))->a,
-	    ((SomeType *)pointer_to_current(&q))->buf,
-	    current_priority(&q));
-        next_element(&q);
+        Process p;
+        int32_t prior;
+        peek_at_current(q, &p, &prior);
+        printf("%ld --> %d / with priority %u.\n", ++element, p.pid, prior);
+        next_element(q);
     }   
 }
 
 bool processes_exist(void)
 {
-    if (empty_queue(ArrivalQ) && empty_queue(q1) && empty_queue(q2) && empty_queue(q3) && empty_queue(q4))
+    if (empty_queue(&waitQ) && empty_queue(&q1) && empty_queue(&q2) && empty_queue(&q3) && empty_queue(&q4))
         return false;
     else
         return true;
@@ -91,49 +89,30 @@ bool processes_exist(void)
 
 void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
 {
-    rewind_queue(ArrivalQ); // moves to the start of ArrivalQ
-    while(true)
+    rewind_queue(&waitQ); //moves to the start of waitQ
+    int element = 0;
+    while (! end_of_queue(&waitQ)) //read elements 1 by one
     {
-        Process* process;
-        int32_t* priority;
-        peek_at_current(ArrivalQ, process, priority); // copies our current element into process and priority variables
-
-        // if it arrives at the currentTime, add it to Q1 and delete from ArrivalQ
-        if(process->arrival_time == currentTime) /* [May need to be changed to '<=' unsure] */
+        Process process;
+        int32_t priority;
+        peek_at_current(&waitQ, &process, &priority); //grabs values and store them in process and priority
+        if (process.arrival_time == currentTime)
         {
-            add_to_queue(HighPrioQueue, process, priority);
-            delete_current(ArrivalQ);
-            printf("CREATE: Process %d entered the ready queue at time %d", process->pid, currentTime);
+            // add element to q1 and remove from waitQ
+            add_to_queue(HighPrioQueue, &process, priority);
+            delete_current(&waitQ);
+            printf("CREATE: Process %d entered the ready queue at time %d\n", process.pid, currentTime);
         }
-        else break; // since elements should be in order, when the above check fails, we stop
+        else next_element(&waitQ);
     }
 }
 
 void execute_highest_priority_process(int currentTime)
 {
     //TODO: DEFINE BEHAVIOR
+    printf("[EXEC] CURRENT TIME: %d\n", currentTime);
 
     // iterate through each queue in order of priority?
-    if(!empty_queue(q1))
-    {
-        // find and execute first process
-    }
-    else if(!emptyqueue(q2))
-    {
-
-    }
-    else if(!emptyqueue(q3))
-    {
-
-    }
-    else if(!emptyqueue(q4))
-    {
-
-    }
-    else
-    {
-        //execute the null process
-    }
 
     // when you get to the process you need to figure out what queue it is in for the printf
     // print should be printf("RUN: Process %d started execution from level %d at time %d; wants to execute for %d ticks", pid, queueLevel, currentTime, timeToI0);
@@ -142,6 +121,7 @@ void execute_highest_priority_process(int currentTime)
 void do_IO(int currentTime)
 {
     //TODO: DEFINE BEHAVIOR
+    printf("[I/0] CURRENT TIME: %d\n", currentTime);
 
     //printf("I/O: Process %d blocked for I/O at time %d", pid, currentTime);
 }
@@ -154,35 +134,61 @@ void final_report(int currentTime)
 
 int main(int argc, char* argv[])
 {
+    printf("=====================================\n");
+    printf("INITIALIZING QUEUES\n");
     //initializing all of the queues
-    init_queue(ArrivalQ, sizeof(void*), true, NULL, true); 
-    init_queue(finalReport, sizeof(void*), true, NULL, true); 
-    init_queue(q1, sizeof(void*), true, NULL, true);
-    init_queue(q2, sizeof(void*), true, NULL, true);
-    init_queue(q3, sizeof(void*), true, NULL, true);
-    init_queue(q4, sizeof(void*), true, NULL, true);
+    init_queue(&waitQ, sizeof(Process), true, NULL, true); 
+    printf("ARRIVAL QUEUE INITIALIZED\n");
+    init_queue(&finalReport, sizeof(Process), true, NULL, true);
+    printf("FINAL REPORT QUEUE INITIALIZED\n");
+    init_queue(&q1, sizeof(Process), true, NULL, true);
+    printf("Q1 INITIALIZED\n");
+    init_queue(&q2, sizeof(Process), true, NULL, true);
+    printf("Q2 INITIALIZED\n");
+    init_queue(&q3, sizeof(Process), true, NULL, true);
+    printf("Q3 INITIALIZED\n");
+    init_queue(&q4, sizeof(Process), true, NULL, true);
+    printf("Q4 INITIALIZED\n");
+    printf("ALL QUEUES INITIALIZED SUCCESFULLY\n");
+    printf("=====================================\n");
 
     // this process is what runs when no actual processes exists or all processes are doing I/0
     // this could also be an integer if need be
+    printf("INITIALIZING THE NULL PROCESS\n");
     Process nullProcess;
+    printf("Created: nullProcess\n");
     ProcessBehavior nullProcessBehavior;
+    printf("Created: nullProcessBehavior\n");
+    printf("initializing: nullProcess\n");
     init_process(&nullProcess);
+    printf("initialized: nullProcess\n");
+    printf("NULL PROCESS INITIALIZED\n");
+    printf("=====================================\n");
 
     // read in all the process info from stdin
+    printf("READING: STDIN\n");
     read_process_descriptions();
+    printf("ALL PROCESSES ADDED TO WAITQ\n");
+    printf("=====================================\n");
 
     if (argc > 1) 
     {// for debugging
-    dump_queue(ArrivalQ);
+    dump_queue(&waitQ);
     }
 
     int clock = 0;
+    printf("CLOCK SET: 0\n");
+    printf("ENETERING MAIN LOOP\n");
     while (processes_exist()) 
     {
         clock++; // might need to put this after do_IO, unsure
-        queue_new_arrivals(clock, q1);
+        printf("clock time: %d\n", clock);
+        queue_new_arrivals(clock, &q1);
+        printf("queued new arrivals\n");
         execute_highest_priority_process(clock);
+        printf("executed highest priority process\n");
         do_IO(clock);
+        printf("did I/0\n");
     }
 
     clock++;
