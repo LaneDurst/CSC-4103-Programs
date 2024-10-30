@@ -43,6 +43,7 @@ typedef struct Process{
     int b; // stores how many times the process has misbehaved at its current level, consecutively
     int level; // stores what queue level the process is in, for easier access
     bool doingIO;
+    bool justAdded; // tells if the value was just added to the queue, for cl output
     Queue behaviors;
 }Process;
 
@@ -129,6 +130,7 @@ void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
             process.level = 1;
             process.remQuant = quantums[process.level-1];
             process.remBurst = b.cpuburst;
+            process.justAdded = true;
             add_to_queue(HighPrioQueue, &process, priority);
             delete_current(&waitQ);
             printf("CREATE: Process %d entered the ready queue at time %d\n", process.pid, currentTime);
@@ -137,61 +139,65 @@ void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
     }
 }
 
-void promote_demote(Process *p, int32_t priority)
+// this returns whatever queue the process was put into so we can track it
+Queue* promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
 {
-    if (p->g >= proCriteria[p->level-1]) //promote the process
+    Queue *proQ;
+    Queue *demoQ;
+    switch(p->level)
     {
-        switch(p->level) // update the value in the array
-        { // should never be able to promote from Q1, hence no case 1:
-        case 2:
-            p->level = 1;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q2); // should still be the current element when we get to this point
-            add_to_queue(&q1, p, priority);
-            break;
-        case 3:
-            p->level = 1;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q3);
-            add_to_queue(&q2, p, priority);
-            break;
-        case 4:
-            p->level = 1;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q4);
-            add_to_queue(&q3, p, priority);
-            break;
-        }
-    }
-    else if (p->b >= demoCriteria[p->level-1]) //demote the value
-    {
-        switch(p->level) // update the value in the array
-        { // should never be able to demote from Q4, hence no case 4:
         case 1:
-            p->level = 2;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q1);
-            add_to_queue(&q2, p, priority);
-            break;
+            proQ = &q1; // this should never occur, but fallback behavior is good
+            demoQ = &q2;
         case 2:
-            p->level = 3;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q2); // should still be the current element when we get to this point
-            add_to_queue(&q3, p, priority);
-            break;
+            proQ = &q1;
+            demoQ = &q3;
         case 3:
-            p->level = 4;
-            p->g = 0;
-            p->b = 0;
-            delete_current(&q3);
-            add_to_queue(&q4, p, priority);
-            break;
-        }
+            proQ = &q2;
+            demoQ = &q4;
+        case 4:
+            proQ = &q3;
+            demoQ = &q4; // this should never occur, but fallback behavior is good
+    }
+
+    /*
+    Process redundProc;
+    int32_t redundPrio;
+    peek_at_current(q, &redundProc, &redundPrio);
+
+    if(!(redundProc.pid == p->pid && redundPrio == priority))
+    {
+        printf("[line 166] ERROR: current element for queue does not match input element\n");
+        //printf("[%d =/= %d || %d =/= %d]\n", redundProc.pid, p->pid, redundPrio, priority);
+        return NULL;
+    }
+    */
+    
+    if (p->g >= proCriteria[p->level-1])
+    {
+        printf("promoting %d\n", p->pid);
+        p->level = p->level-1;
+        p->g = 0;
+        p->b = 0;
+        p->remQuant = quantums[p->level-1];
+        p->justAdded = true;
+        delete_current(q);
+        add_to_queue(proQ, p, priority);
+        printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
+        return proQ;
+    }
+    else if (p->b >= demoCriteria[p->level-1])
+    {
+        //printf("demoting %d\n", p->pid);
+        p->level = p->level+1;
+        p->g = 0;
+        p->b = 0;
+        p->remQuant = quantums[p->level-1];
+        p->justAdded = true;
+        delete_current(q);
+        add_to_queue(demoQ, p, priority);
+        printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
+        return demoQ;
     }
 }
 
@@ -199,26 +205,31 @@ void execute_highest_priority_process(int currentTime)
 {
     Process p;
     int32_t priority;
+    Queue *q;
     //printf("grabbing process info\n");
     if (!empty_queue(&q1)) // if it is NOT empty
     {
         rewind_queue(&q1); // make sure we are at the start
         peek_at_current(&q1, &p, &priority); // grab the first value in the queue
+        q = &q1;
     }
     else if (!empty_queue(&q2))
     {
         rewind_queue(&q2);
         peek_at_current(&q2, &p, &priority);
+        q = &q2;
     }
     else if (!empty_queue(&q3))
     {
         rewind_queue(&q3);
         peek_at_current(&q3, &p, &priority);
+        q = &q3;
     }
     else if (!empty_queue(&q4))
     {
         rewind_queue(&q4);
         peek_at_current(&q4, &p, &priority);
+        q = &q4;
     }
     else
     {
@@ -234,28 +245,30 @@ void execute_highest_priority_process(int currentTime)
     peek_at_current(&p.behaviors, &b, &bPriority);
 
     int Quantum = quantums[p.level-1];
-    if(p.remQuant == Quantum) // it has just entered the cpu stage
+    if(p.justAdded) // it has just entered the cpu stage
     {
-        printf("RUN: Process %d started execution from level %d at time %d wants to execute for %d ticks.\n", p.pid, p.level, currentTime, p.remBurst);
+        printf("RUN: Process %d started execution from level %d at time %d; wants to execute for %d ticks.\n", p.pid, p.level, currentTime, p.remBurst);
+        p.justAdded = false;
     }
 
     if(p.remQuant == 0) // the process used its full quantum
     {
         p.b++;
         p.g = 0;
+        //printf("[%d] bad: %d\tgood:%d\n",currentTime, p.b, p.g);
         if (p.remBurst == 0) // finished the cpu burst
         {
             p.doingIO = true;
             p.remIO = b.ioburst;
             add_to_queue(&IO, &p, priority);
         }
-        else
-            p.remBurst--; // don't need p.remQuant-- because remQuant is already 0 when we get here
+        p.remQuant = quantums[p.level-1]; // for if it uses the full quantum but doesn't get demoted
     }
     else if(p.remBurst == 0) // finished burst, but didn't use the whole quantum
     {
         p.g++;
         p.b = 0;
+        //printf("[%d] bad: %d\tgood:%d\n",currentTime, p.b, p.g);
         p.doingIO = true;
         p.remIO = b.ioburst;
         add_to_queue(&IO, &p, priority);
@@ -266,28 +279,6 @@ void execute_highest_priority_process(int currentTime)
         p.remBurst--;
     }
 
-    switch(p.level) // update the value in the array
-    {
-    case 1:
-        if (p.doingIO) delete_current(&q1);
-        else update_current(&q1, &p);
-        break;
-    case 2:
-        if (p.doingIO) delete_current(&q2);
-        else update_current(&q2, &p);
-        break;
-    case 3:
-        if (p.doingIO) delete_current(&q3);
-        else update_current(&q3, &p);
-        break;
-    case 4:
-        if (p.doingIO) delete_current(&q3);
-        else update_current(&q3, &p);
-        break;
-    }
-        
-    promote_demote(&p, priority); // do promotion/demotion operations
-
     if (p.timesRepeated == b.repeat) // if the current behavior has finished its repeat cycles
         delete_current(&p.behaviors);
     if (empty_queue(&p.behaviors)) // the process has completely finished
@@ -295,25 +286,15 @@ void execute_highest_priority_process(int currentTime)
         // adding data to finalReport queue
         finishInfo f = {.pid = p.pid, .finishTime = currentTime};
         add_to_queue(&finalReport, &f, priority);
+        delete_current(q);
 
-        switch(p.level) //removing process from whatever queue it was in
-        {
-        case 1:
-            delete_current(&q1);
-            break;
-        case 2:
-            delete_current(&q2);
-            break;
-        case 3:
-            delete_current(&q3);
-            break;
-        case 4:
-            delete_current(&q4);
-            break;
-        }
-
-        printf("FINISHED: Process %d finished at time %d\n", p.pid, currentTime);
+        printf("FINISHED: Process %d finished at time %d.\n", p.pid, currentTime);
+        return;
     }
+
+    if (p.doingIO) delete_current(q);
+    else update_current(q, &p);
+    promote_demote(&p, priority, q, currentTime); // do promotion/demotion operations
 }
 
 void do_IO(int currentTime)
@@ -342,6 +323,8 @@ void do_IO(int currentTime)
                 p.remQuant = quantums[p.level];
                 p.remBurst = b.cpuburst;
                 p.timesRepeated++; //has finished one CPU / IO cycle
+                p.justAdded = true;
+                printf("QUEUED: Process %d queued at level %d at time %d.\n", p.pid, p.level, currentTime);
                 switch(p.level) // add it back to whatever queue it was in
                 {
                 case 1:
@@ -432,7 +415,7 @@ int main(int argc, char* argv[])
     while (processes_exist()) //TODO: CHANGE THIS BACK TO 'while(processes_exist())' ONCE FINISHED
     {
         clock++; // might need to put this after do_IO, unsure
-        if (clock%10 == 0) printf("[DEBUG] Clock time: %d\n", clock);
+        //if (clock%10 == 0) printf("[DEBUG] Clock time: %d\n", clock);
         queue_new_arrivals(clock, &q1);
         //printf("queued new arrivals\n");
         execute_highest_priority_process(clock);
