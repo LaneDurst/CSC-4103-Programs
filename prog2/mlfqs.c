@@ -43,6 +43,7 @@ typedef struct Process{
     int b; // stores how many times the process has misbehaved at its current level, consecutively
     int level; // stores what queue level the process is in, for easier access
     bool doingIO;
+    bool usedQuant;
     bool justAdded; // tells if the value was just added to the queue, for cl output
     Queue behaviors;
 }Process;
@@ -60,6 +61,7 @@ void init_process(Process* p)
     p->remQuant;
     p->timesRepeated = 0;
     p->doingIO = false;
+    p->usedQuant = false;
 }
 
 static void read_process_descriptions(void)
@@ -140,7 +142,7 @@ void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
 }
 
 // this returns whatever queue the process was put into so we can track it
-void promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
+bool promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
 {
     Queue *proQ;
     Queue *demoQ;
@@ -180,10 +182,12 @@ void promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
         p->g = 0;
         p->b = 0;
         p->remQuant = quantums[p->level-1];
+        p->usedQuant = false;
         p->justAdded = true;
         delete_current(q);
         add_to_queue(proQ, p, priority);
         printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
+        return true;
     }
     else if (p->b >= demoCriteria[p->level-1])
     {
@@ -193,10 +197,14 @@ void promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
         p->b = 0;
         p->remQuant = quantums[p->level-1];
         p->justAdded = true;
+        p->usedQuant = false;
         delete_current(q);
         add_to_queue(demoQ, p, priority);
         printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
+        return true;
     }
+    else
+        return false;
 }
 
 void execute_highest_priority_process(int currentTime)
@@ -253,6 +261,7 @@ void execute_highest_priority_process(int currentTime)
     {
         p.b++;
         p.g = 0;
+        p.usedQuant = true;
         //printf("[%d] bad: %d\tgood:%d\n",currentTime, p.b, p.g);
         if (p.remBurst == 0) // finished the cpu burst
         {
@@ -295,8 +304,14 @@ void execute_highest_priority_process(int currentTime)
     }
     else
     {
-        update_current(q, &p);
-        promote_demote(&p, priority, q, currentTime);
+        bool moved = promote_demote(&p, priority, q, currentTime);
+        if(p.usedQuant && !moved)
+        {
+            printf("QUEUED: Process %d queued at level %d at time %d.\n", p.pid, p.level, currentTime);
+            p.usedQuant = false;
+            p.justAdded = true;
+        }
+        if (!moved) update_current(q, &p);
     }
 }
 
