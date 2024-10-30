@@ -140,7 +140,7 @@ void queue_new_arrivals(int currentTime, Queue* HighPrioQueue)
 }
 
 // this returns whatever queue the process was put into so we can track it
-Queue* promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
+void promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
 {
     Queue *proQ;
     Queue *demoQ;
@@ -184,7 +184,6 @@ Queue* promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
         delete_current(q);
         add_to_queue(proQ, p, priority);
         printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
-        return proQ;
     }
     else if (p->b >= demoCriteria[p->level-1])
     {
@@ -197,7 +196,6 @@ Queue* promote_demote(Process *p, int32_t priority, Queue *q, int currentTime)
         delete_current(q);
         add_to_queue(demoQ, p, priority);
         printf("QUEUED: Process %d queued at level %d at time %d.\n", p->pid, p->level, currentTime);
-        return demoQ;
     }
 }
 
@@ -260,7 +258,6 @@ void execute_highest_priority_process(int currentTime)
         {
             p.doingIO = true;
             p.remIO = b.ioburst;
-            add_to_queue(&IO, &p, priority);
         }
         p.remQuant = quantums[p.level-1]; // for if it uses the full quantum but doesn't get demoted
     }
@@ -271,7 +268,6 @@ void execute_highest_priority_process(int currentTime)
         //printf("[%d] bad: %d\tgood:%d\n",currentTime, p.b, p.g);
         p.doingIO = true;
         p.remIO = b.ioburst;
-        add_to_queue(&IO, &p, priority);
     }
     else // has not used the full quantum or finished cpu burst
     {
@@ -292,9 +288,16 @@ void execute_highest_priority_process(int currentTime)
         return;
     }
 
-    if (p.doingIO) delete_current(q);
-    else update_current(q, &p);
-    promote_demote(&p, priority, q, currentTime); // do promotion/demotion operations
+    if (p.doingIO) //because of how IO is set up, this will handle promotions for values put into IO once they are finished
+    {
+        delete_current(q);
+        add_to_queue(&IO, &p, priority);
+    }
+    else
+    {
+        update_current(q, &p);
+        promote_demote(&p, priority, q, currentTime);
+    }
 }
 
 void do_IO(int currentTime)
@@ -320,7 +323,7 @@ void do_IO(int currentTime)
             if (p.remIO == 0)
             {
                 p.doingIO = false;
-                p.remQuant = quantums[p.level];
+                p.remQuant = quantums[p.level-1];
                 p.remBurst = b.cpuburst;
                 p.timesRepeated++; //has finished one CPU / IO cycle
                 p.justAdded = true;
